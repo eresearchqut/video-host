@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<head>
+  <link href="https://vjs.zencdn.net/7.18.1/video-js.css" rel="stylesheet" />
+  <script src="https://vjs.zencdn.net/7.18.1/video.min.js"></script>
+  <style>
+      html, body, video {
+          height: 100%;
+      }
+
+      form input {
+          display: block;
+          width: 100%;
+          margin-bottom: 20px;
+      }
+  </style>
+</head>
+<body>
+<form id="inputForm">
+  <label>
+    Source File URL
+    <input type="text" name="sourceUrl" id="sourceUrl"
+           value="https://abcdefghijklmn.cloudfront.net/test/ABCDEFGHIJKLMNOPQRSTUVWXYZ/hls/beach.m3u8">
+  </label>
+  <label>
+    Source File Type
+    <input type="text" name="sourceType" id="sourceType" value="application/x-mpegURL">
+  </label>
+  <label>
+    Poster URL
+    <input type="text" name="sourcePoster" id="sourcePoster"
+           value="https://abcdefghijklmn.cloudfront.net/test/ABCDEFGHIJKLMNOPQRSTUVWXYZ/poster/beach.0000000.jpg">
+  </label>
+  <label>
+    Initial bandwidth (MB/S)
+    <input type="number" name="initialBandwidth" id="initialBandwidth"
+           value="5" step="0.1">
+  </label>
+  <button type="submit">Render video</button>
+</form>
+<video
+  id="test-video"
+  class="video-js"
+  controls
+  preload="auto"
+>
+  <p class="vjs-no-js">
+    To view this video please enable JavaScript, and consider upgrading to a
+    web browser that
+    <a href="https://videojs.com/html5-video-support/" target="_blank"
+    >supports HTML5 video</a
+    >
+  </p>
+</video>
+<script>
+  videojs.log.level("debug");
+  const params = Array.from(new URLSearchParams(window.location.search));
+
+  if (params.length === 0) {
+    document.getElementById("test-video").remove();
+  } else {
+    document.getElementById("inputForm").remove();
+    const {
+      sourceUrl,
+      sourceType,
+      sourcePoster,
+      initialBandwidth
+    } = Object.fromEntries(params);
+    videojs("test-video", {
+      fill: true,
+      html5: {
+        limitRenditionByPlayerDimensions: false,
+        initialBandwidth: parseInt(initialBandwidth, 10) * Math.pow(10, 8)
+      },
+      sources: [
+        {
+          src: sourceUrl,
+          type: sourceType
+        }
+      ],
+      poster: sourcePoster
+    });
+  }
+</script>
+</body>

@@ -1,0 +1,203 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Video host
+Parameters:
+  ProjectPrefix:
+    Type: String
+    Description: The prefix to upload project-specific video files to
+    Default: input
+Globals:
+  Function:
+    MemorySize: 128
+    Runtime: nodejs14.x
+Resources:
+  InputBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWS::StackName}-${AWS::Region}-${AWS::AccountId}-input"
+      LifecycleConfiguration:
+        Rules:
+          - AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+            Status: Enabled
+          - ExpirationInDays: 30
+            Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+  UploadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Architectures:
+        - arm64
+      Timeout: 10
+      CodeUri: src/handlers
+      Handler: upload.lambdaHandler
+      Runtime: nodejs14.x
+      Environment:
+        Variables:
+          OUTPUT_BUCKET_NAME: !Ref DistributionBucket
+          MEDIACONVERT_ROLE_ARN: !GetAtt MediaConvertRole.Arn
+      Events:
+        VideoUpload:
+          Type: S3
+          Properties:
+            Bucket: !Ref InputBucket
+            Events: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: !Ref ProjectPrefix
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Sub "arn:aws:s3:::${AWS::StackName}-${AWS::Region}-${AWS::AccountId}-input"
+        - Statement:
+            - Effect: "Allow"
+              Action:
+                - "mediaconvert:*"
+              Resource: "arn:aws:mediaconvert:*"
+            - Effect: "Allow"
+              Action:
+                - "iam:ListRoles"
+                - "iam:PassRole"
+              Resource: !GetAtt MediaConvertRole.Arn
+      Tracing: Active
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - upload.ts
+        Minify: true
+        Sourcemap: true
+        Target: "es2020"
+  MediaConvertRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "mediaconvert.amazonaws.com"
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub "${AWS::StackName}-MediaConvertPolicy"
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - !Sub 'arn:aws:s3:::${AWS::StackName}-${AWS::Region}-${AWS::AccountId}-input/*'
+              - Effect: 'Allow'
+                Action:
+                  - s3:PutObject
+                Resource:
+                  - !Sub 'arn:aws:s3:::${AWS::StackName}-${AWS::Region}-${AWS::AccountId}-distribution/*'
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AWSElementalMediaConvertFullAccess"
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: !Sub '${AWS::StackName}'
+        Enabled: true
+        IPV6Enabled: true
+        Origins:
+          - Id: !Ref DistributionBucket
+            DomainName: !GetAtt DistributionBucket.DomainName
+            OriginCustomHeaders:
+              - HeaderName: Input-Bucket-Name
+                HeaderValue: !Ref InputBucket
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}'
+        DefaultCacheBehavior:
+          TargetOriginId: !Ref DistributionBucket
+          DefaultTTL: 31536000 # 1 year
+          LambdaFunctionAssociations:
+            - EventType: origin-response
+              LambdaFunctionARN: !Ref ServeFunction.Version
+          ForwardedValues:
+            QueryString: false
+            Headers:
+              - Origin
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+  DistributionBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWS::StackName}-${AWS::Region}-${AWS::AccountId}-distribution"
+      LifecycleConfiguration:
+        Rules:
+          - AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+            Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+  DistributionBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref DistributionBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action: 's3:GetObject'
+            Resource:
+              - !Sub "arn:aws:s3:::${DistributionBucket}/*"
+            Principal:
+              AWS: !Sub "arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${CloudFrontOriginAccessIdentity}"
+  CloudFrontOriginAccessIdentity:
+    Type: 'AWS::CloudFront::CloudFrontOriginAccessIdentity'
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub '${AWS::StackName}'
+  ServeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Architectures:
+        - x86_64
+      Timeout: 5
+      CodeUri: src/handlers
+      Handler: serve.lambdaHandler
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref InputBucket
+      AutoPublishAlias: edge
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+                - edgelambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - serve.ts
+        Minify: true
+        Sourcemap: true
+        Target: "es2020"
+Outputs:
+  DistributionDomain:
+    Description: "Domain of the cloudfront distribution"
+    Value: !GetAtt Distribution.DomainName
+  InputBucket:
+    Description: "Name of the input bucket"
+    Value: !Ref InputBucket
+  MediaConvertRole:
+    Description: "ARN of the role passed to MediaConvert"
+    Value: !GetAtt MediaConvertRole.Arn

@@ -1,0 +1,14 @@
+version=0.1
+[default.global.parameters]
+stack_name = "video-host"
+
+[default.build.parameters]
+beta_features = true
+[default.sync.parameters]
+beta_features = true
+
+[default.deploy]
+[default.deploy.parameters]
+region = "us-east-1"
+capabilities = "CAPABILITY_IAM"
+

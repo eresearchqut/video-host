@@ -1,0 +1,6 @@
+{
+  "Parameters": {
+    "OUTPUT_BUCKET_NAME": "video-host-us-east-1-123456789012-distribution",
+    "MEDIACONVERT_ROLE_ARN": "arn:aws:iam::123456789012:role/video-host-MediaConvertRole-ABCDEFGHIJ"
+  }
+}
