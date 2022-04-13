@@ -47,7 +47,16 @@ export const lambdaHandler = async (event: CloudFrontResponseEvent) => {
   if (project !== undefined) {
     if (config[project]?.allowedOrigins.includes(originValue)) {
       response.headers['access-control-allow-origin'] = [{ key: 'Access-Control-Allow-Origin', value: originValue }];
+      response.headers['access-control-allow-methods'] = [{ key: 'Access-Control-Allow-Methods', value: 'GET, HEAD' }];
       response.headers['vary'] = [{ key: 'Vary', value: 'Origin' }];
+
+      if (request.method === 'OPTIONS') {
+        response.headers['access-control-allow-headers'] = [{ key: 'Access-Control-Allow-Headers', value: '*' }];
+        response.headers['access-control-max-age'] = [{ key: 'Access-Control-Max-Age', value: '3600' }];
+        response.status = '200';
+        response.statusDescription = 'OK';
+      }
+
       console.log(`Allowed origin ${originValue} in project ${project}`);
     } else {
       console.log(`Failed to find origin ${originValue} in project ${project}`);

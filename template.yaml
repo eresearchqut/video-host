@@ -118,6 +118,10 @@ Resources:
             S3OriginConfig:
               OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}'
         DefaultCacheBehavior:
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
           TargetOriginId: !Ref DistributionBucket
           DefaultTTL: 31536000 # 1 year
           LambdaFunctionAssociations:
@@ -127,6 +131,7 @@ Resources:
             QueryString: false
             Headers:
               - Origin
+              - Access-Control-Request-Method
             Cookies:
               Forward: none
           ViewerProtocolPolicy: redirect-to-https
