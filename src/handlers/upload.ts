@@ -171,6 +171,7 @@ export const lambdaHandler = async (event: S3Event) => {
                     ContainerSettings: {
                       Container: 'CMFC',
                     },
+                    NameModifier: '_cmaf',
                   },
                   {
                     AudioDescriptions: [
@@ -188,6 +189,7 @@ export const lambdaHandler = async (event: S3Event) => {
                     ContainerSettings: {
                       Container: 'CMFC',
                     },
+                    NameModifier: '_cmaf',
                   },
                 ],
                 AutomatedEncodingSettings: {
