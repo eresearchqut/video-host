@@ -1,6 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Video host
+Description: |
+  Video hosting for multiple projects & origins using AWS Elemental MediaConvert, CloudFront, and Lambda.
+  https://github.com/eresearchqut/video-host
 Parameters:
   ProjectPrefix:
     Type: String
