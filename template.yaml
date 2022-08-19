@@ -24,6 +24,7 @@ Resources:
             Status: Enabled
           - ExpirationInDays: 30
             Status: Enabled
+            Prefix: "input"
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
